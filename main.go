@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"encoding/csv"
 	"flag"
 	"fmt"
+	"io"
 	"math/rand/v2"
 	"os"
 	"strconv"
@@ -24,12 +26,25 @@ func main() {
 	flag.StringVar(&statusFlag, "s", "", "outputs all tasks")
 	flag.Parse()
 
+	os.Create("output.csv")
+
+	data, err := readCSVFile()
+	if err != nil {
+		fmt.Println("Error reading file: ", err)
+		return
+	}
+	reader, err := parseCSV(data)
+	if err != nil {
+		fmt.Println("Error creating CSV reader: ", err)
+		return
+	}
+
 	if addFlag != "" {
 		add(addFlag, "output.csv")
 	} else if deleteFlag != "" && idFlag != -1 {
 		delete(idFlag)
 	} else if statusFlag != "" {
-		status()
+		status(reader)
 	} else {
 		fmt.Println("Invalid argument")
 	}
@@ -61,8 +76,19 @@ func delete(taskID int) {
 
 }
 
-// Will print all tasks that are still needing to be complete
-func printTasks() {}
+// Will print all tasks
+func status(reader *csv.Reader) {
+	for {
+		record, err := reader.Read()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			fmt.Println("Error reading CSV data: ", err)
+			break
+		}
+		fmt.Println(record)
+	}
+}
 
 // Creates CSV File
 func createCSVWriter(filename string) (*csv.Writer, *os.File, error) {
@@ -79,4 +105,22 @@ func writeCSVRecord(writer *csv.Writer, record []string) {
 	if err != nil {
 		fmt.Println("Error writing record to CSV: ", err)
 	}
+}
+
+func readCSVFile() ([]byte, error) {
+	f, err := os.Open("output.csv")
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	data, err := io.ReadAll(f)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+func parseCSV(data []byte) (*csv.Reader, error) {
+	reader := csv.NewReader(bytes.NewReader(data))
+	return reader, nil
 }
